@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="1cbdcb6e-3950-454a-84dd-f336e3be8fc4" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/frontend.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/pom.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/Caller.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/KcMfaServiceApplication.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/MfaController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/MfaCredential.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/MfaCredentialRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/MfaPending.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/MfaPendingRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/MfaProps.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/MfaService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/PendingCleanup.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/SecretCrypto.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/SecurityConfig.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/java/com/ktb/mfa/TotpService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/resources/application.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/main/resources/db/migration/V1__init.sql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/test/java/com/ktb/mfa/CallerTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-service/src/test/java/com/ktb/mfa/CryptoAndTotpTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/pom.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/Challenge.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/ChallengeStore.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/ChallengeSweeper.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/ExternalOAuthClient.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/Http.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/InMemoryChallengeStore.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/InMemoryOAuthStateStore.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/KcMfaAuthController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/KcMfaAutoConfiguration.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/KcMfaOAuthController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/KcMfaProperties.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/KcMfaRedisAutoConfiguration.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/KeycloakClient.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/LoginFlow.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/MfaResult.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/MfaServiceClient.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/OAuthEntry.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/OAuthLoginFlow.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/OAuthStateStore.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/RedisChallengeStore.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/RedisOAuthStateStore.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/ServiceTokenProvider.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/java/com/ktb/kcmfa/starter/SessionRevoker.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/test/java/com/ktb/kcmfa/starter/ChallengeSweeperTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/test/java/com/ktb/kcmfa/starter/LoginFlowTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/test/java/com/ktb/kcmfa/starter/OAuthLoginFlowTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mfa-spring-boot-starter/src/test/java/com/ktb/kcmfa/starter/RedisStoresTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 8
+}]]></component>
+  <component name="ProjectId" id="3M2ZrZHRgw5DfFXXLozZpTkNZa0" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "master",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "D:/DSL/kc-mfa",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-9823dce3aa75-28b599e66164-intellij.indexing.shared.core-IU-242.26775.15" />
+        <option value="bundled-js-predefined-d6986cc7102b-5c90d61e3bab-JavaScript-IU-242.26775.15" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="1cbdcb6e-3950-454a-84dd-f336e3be8fc4" name="Changes" comment="" />
+      <created>1794550822082</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1794550822082</updated>
+      <workItem from="1794550823096" duration="2255000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

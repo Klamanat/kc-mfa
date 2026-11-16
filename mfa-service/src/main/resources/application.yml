@@ -1,0 +1,59 @@
+server:
+  port: 8090
+
+spring:
+  datasource:
+    # PostgreSQL บน cluster ที่มีอยู่แล้ว (แยก schema/user ให้ service นี้) ค่าทั้งสามมาจาก secret manager
+    url: ${MFA_DB_URL}                  # jdbc:postgresql://host:5432/dbname?currentSchema=mfa
+    username: ${MFA_DB_USER}
+    password: ${MFA_DB_PASSWORD}
+    hikari:
+      # ทุก request ใช้ connection สั้นมาก (query บน primary key) เริ่มที่ค่านี้แล้วปรับจากผล load test
+      # รวมทุก instance ต้องไม่เกิน max_connections ที่ DB ให้ service นี้
+      maximum-pool-size: ${MFA_DB_POOL_SIZE:20}
+      minimum-idle: 5
+      connection-timeout: 2000          # ms: pool เต็มให้ตอบ error เร็ว ดีกว่าค้าง (เว็บจะ fail-closed)
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate                # schema มาจาก Flyway: src/main/resources/db/migration
+    properties:
+      jakarta.persistence.lock.timeout: 3000   # ms: รอ row lock ของ user เดียวกันไม่เกินนี้
+
+mfa:
+  # คีย์ AES-256 แบบ base64 (32 bytes) เก็บใน secret manager/KMS:  openssl rand -base64 32
+  encryption-key: ${MFA_ENCRYPTION_KEY}
+  lock-after-failures: 10      # ผิดสะสมต่อ user ก่อนล็อก
+  lock-duration: 15m
+  enroll-ttl: 10m              # อายุของ secret ที่ยังไม่ยืนยัน
+
+  # issuer (iss) ของ token ที่เชื่อถือ = realm ละหนึ่งรายการ ต้องตรงกับ iss ใน token เป๊ะ
+  # (Keycloak 16 มี /auth ใน URL; Keycloak 17+ แบบ Quarkus ไม่มี)
+  trusted-issuers:
+    - https://keycloak.example.com/auth/realms/brand-a
+    - https://keycloak.example.com/auth/realms/brand-b
+
+  # token ที่เรียก service นี้ต้องมี aud นี้ (เพิ่ม Audience mapper ให้ client ของแต่ละเว็บใน Keycloak)
+  # กัน token ของ service account ที่เว็บส่งไปให้ API อื่น ถูก API นั้นนำมาเรียก service นี้ต่อ
+  # ตั้งเป็นค่าว่างเพื่อปิดการตรวจ (ไม่แนะนำ)
+  required-audience: mfa-service
+
+  # ทุก request ต้องแนบ token ของ user (X-User-Token) token ที่หมดอายุแล้วยังรับได้อีกเท่านี้
+  # (เวลาที่ user ใช้กรอก OTP / สแกน QR) ควร >= kcmfa.challenge-ttl ของเว็บ
+  user-token-grace: 15m
+
+  # allowlist ของ backend ที่เรียก service นี้ได้ = (realm, client-id) + policy ของเว็บนั้น
+  clients:
+    - realm: brand-a
+      client-id: web1-backend
+      enforce: true              # true = user ที่ยังไม่มี MFA ต้อง enroll ก่อนได้ token
+      issuer-label: "Brand A"    # ชื่อที่แสดงในแอป Authenticator
+      # login-client-ids: [web1-frontend]   # ถ้า token ของ user ออกโดย client อื่นของ realm เดียวกัน
+      # external-providers:                 # ถ้าเว็บเปิด kcmfa.oauth (provider ต้องตรงกับ kcmfa.oauth.provider)
+      #   - provider: google
+      #     issuer: https://accounts.google.com
+      #     audience: <client-id ที่ลงทะเบียนกับ provider>
+    - realm: brand-b
+      client-id: web2-backend
+      enforce: false
+      issuer-label: "Brand B"
