@@ -13,15 +13,24 @@
 
   <groupId>com.ktb.kcmfa</groupId>
   <artifactId>kc-mfa-parent</artifactId>
-  <version>0.2.1</version>
+  <version>0.3.0</version>
   <packaging>pom</packaging>
 
   <properties>
     <java.version>17</java.version>
   </properties>
 
+  <!-- mvn deploy ส่งขึ้น GitHub Packages (credential อยู่ใน ~/.m2/settings.xml ที่ server id = github) -->
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/Klamanat/kc-mfa</url>
+    </repository>
+  </distributionManagement>
+
   <modules>
     <module>mfa-service</module>
     <module>mfa-spring-boot-starter</module>
+    <module>demo-backend</module>
   </modules>
 </project>

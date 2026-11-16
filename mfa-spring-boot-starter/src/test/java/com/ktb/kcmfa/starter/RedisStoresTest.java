@@ -99,6 +99,27 @@ class RedisStoresTest {
     }
 
     @Test
+    void encryptedStoresKeepTokensOutOfRedisAndBindValueToItsKey() {
+        PayloadCipher cipher = new PayloadCipher(java.util.Base64.getEncoder().encodeToString(new byte[32]));
+        RedisChallengeStore store = new RedisChallengeStore(redis, "p:", cipher);
+        Challenge c = store.create(Challenge.Type.VERIFY, "u1", "john",
+                Map.of("access_token", "ACCESS-123", "refresh_token", "REFRESH-456"), Duration.ofMinutes(5), false);
+
+        assertTrue(kv.values().stream().noneMatch(v -> v.contains("ACCESS-123") || v.contains("REFRESH-456")));
+        assertEquals("REFRESH-456", store.find(c.id).orElseThrow().tokens.get("refresh_token"));
+
+        // ค่าที่ถูกคัดลอกไปไว้ใต้ key ของ challenge อื่นต้องอ่านไม่ได้
+        kv.put("p:ch:other", kv.get("p:ch:" + c.id));
+        assertFalse(store.find("other").isPresent());
+
+        RedisOAuthStateStore oauth = new RedisOAuthStateStore(redis, "p:", cipher);
+        oauth.put("r:1", OAuthEntry.result(new LoginFlow.LoginResult("OK", null,
+                Map.of("access_token", "OAUTH-ACCESS")), Instant.now().plusSeconds(60)));
+        assertTrue(kv.values().stream().noneMatch(v -> v.contains("OAUTH-ACCESS")));
+        assertEquals("OAUTH-ACCESS", oauth.take("r:1").orElseThrow().tokens.get("access_token"));
+    }
+
+    @Test
     void attemptsAreCountedInRedisAndGoneAfterRemove() {
         RedisChallengeStore store = new RedisChallengeStore(redis, "p:");
         Challenge c = store.create(Challenge.Type.VERIFY, "u1", "john", Map.of(), Duration.ofMinutes(5), false);

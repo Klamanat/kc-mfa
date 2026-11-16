@@ -32,10 +32,16 @@ public class RedisOAuthStateStore implements OAuthStateStore {
 
     private final StringRedisTemplate redis;
     private final String prefix;
+    private final PayloadCipher cipher;      // null = ข้อความล้วน (ดู RedisChallengeStore)
 
     public RedisOAuthStateStore(StringRedisTemplate redis, String prefix) {
+        this(redis, prefix, null);
+    }
+
+    public RedisOAuthStateStore(StringRedisTemplate redis, String prefix, PayloadCipher cipher) {
         this.redis = redis;
         this.prefix = prefix;
+        this.cipher = cipher;
     }
 
     @Override
@@ -45,7 +51,7 @@ public class RedisOAuthStateStore implements OAuthStateStore {
         // เผื่อเวลาให้ตัวเก็บกวาดเฉพาะ entry ที่ถือ token (ต้องอ่านไป revoke) entry อื่นหมดอายุตามจริง
         // เพราะ GET oauth/login ไม่ต้อง login ก่อน จึงไม่ควรค้างใน Redis นานเกินจำเป็น
         life = entry.tokens != null ? life.plus(RedisChallengeStore.GRACE) : life.plusSeconds(1);
-        redis.opsForValue().set(key(key), write(entry), life);
+        redis.opsForValue().set(key(key), seal(key(key), write(entry)), life);
         if (entry.tokens != null) {
             redis.opsForZSet().add(expiryKey(), key, entry.expiresAt.toEpochMilli());
         }
@@ -56,7 +62,7 @@ public class RedisOAuthStateStore implements OAuthStateStore {
         if (key == null) {
             return Optional.empty();
         }
-        OAuthEntry e = read(redis.opsForValue().getAndDelete(key(key)));
+        OAuthEntry e = read(open(key(key), redis.opsForValue().getAndDelete(key(key))));
         if (e != null && e.tokens != null) {
             redis.opsForZSet().remove(expiryKey(), key);
         }
@@ -75,12 +81,20 @@ public class RedisOAuthStateStore implements OAuthStateStore {
             if (won == null || won == 0) {
                 continue;   // instance อื่นหยิบไปแล้ว หรือถูก take() ไปก่อน
             }
-            OAuthEntry e = read(redis.opsForValue().getAndDelete(key(k)));
+            OAuthEntry e = read(open(key(k), redis.opsForValue().getAndDelete(key(k))));
             if (e != null) {
                 expired.add(e);
             }
         }
         return expired;
+    }
+
+    private String seal(String redisKey, String json) {
+        return cipher == null ? json : cipher.encrypt(json, redisKey);
+    }
+
+    private String open(String redisKey, String stored) {
+        return cipher == null || stored == null ? stored : cipher.decrypt(stored, redisKey);
     }
 
     private String key(String key) {

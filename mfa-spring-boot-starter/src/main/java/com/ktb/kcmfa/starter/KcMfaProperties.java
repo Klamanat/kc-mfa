@@ -9,6 +9,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * kcmfa.keycloak.*     Keycloak ของ realm ตัวเอง (client ของเว็บนี้: confidential, Direct Access Grants + Service Accounts เปิด)
  * kcmfa.mfa-service.*  URL ของ MFA service กลาง
  * kcmfa.store          memory (ค่าเริ่มต้น, instance เดียว) | redis (หลาย instance ต้องมี spring-boot-starter-data-redis)
+ * kcmfa.redis-encryption-key   จำเป็นเมื่อ store=redis: คีย์ AES-256 (base64 32 bytes) เข้ารหัส token ที่เก็บใน Redis
+ * kcmfa.redis-allow-plaintext  true = ยอมเก็บเป็นข้อความล้วน (ไม่แนะนำ ใช้เฉพาะ Redis ที่เป็นของเว็บนี้ทั้งหมด + TLS + ACL)
  */
 @ConfigurationProperties(prefix = "kcmfa")
 public record KcMfaProperties(Keycloak keycloak,
@@ -20,7 +22,9 @@ public record KcMfaProperties(Keycloak keycloak,
                               @DefaultValue("30s") Duration sweepInterval,
                               @DefaultValue OAuth oauth,
                               @DefaultValue("memory") String store,
-                              String redisKeyPrefix) {
+                              String redisKeyPrefix,
+                              String redisEncryptionKey,
+                              @DefaultValue("false") boolean redisAllowPlaintext) {
 
     /**
      * prefix ของ key ใน Redis (kcmfa.store=redis) ต้องไม่ซ้ำกันระหว่างเว็บที่ใช้ Redis ร่วมกัน

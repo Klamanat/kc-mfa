@@ -21,10 +21,11 @@ POST /api/auth/login            {username,password}
   -> {status:"OK", tokens}                    ยังไม่มี MFA และเว็บนี้ไม่บังคับ
   -> {status:"MFA_REQUIRED", challengeId}     user มี MFA แล้ว
   -> {status:"ENROLL_REQUIRED", challengeId}  เว็บนี้บังคับ และ user ยังไม่มี MFA
+  -> {status:"ENROLL_INVITE_REQUIRED", challengeId}  เหมือนข้างบน แต่ service ตั้ง invite-required: ต้องใส่รหัสเชิญจาก admin
   -> 401 / 503
 
 POST /api/auth/mfa/verify          {challengeId, code}   -> tokens
-POST /api/auth/mfa/enroll/start    {challengeId}         -> {secret, otpauthUri}
+POST /api/auth/mfa/enroll/start    {challengeId, inviteCode?}  -> {secret, otpauthUri}   (รหัสเชิญผิด = 403)
 POST /api/auth/mfa/enroll/confirm  {challengeId, code}   -> tokens
 ```
 
@@ -90,6 +91,23 @@ kcmfa:
   ใน Keycloak เพิ่ม mapper ชนิด **Audience** ให้ client ของแต่ละเว็บ ใส่ค่า `mfa-service` เป็น custom audience ลงใน access token
   ถ้ายังไม่ได้เพิ่ม mapper ทุก request จะได้ 403
 - `mfa.clients`: allowlist ของ (realm, client-id) พร้อม `enforce` และ `issuer-label`
+- **รหัสเชิญ (`invite-required` ต่อ client: ไม่ตั้ง = ตาม `enforce` จึงเปิดโดยปริยายในเว็บที่บังคับ MFA, ตั้ง `false` เองเท่านั้นจึงจะปิด)**: กันคนที่รู้แค่รหัสผ่านของ user ที่ยังไม่เคยลงทะเบียน
+  มาลงทะเบียน Authenticator ของตัวเองก่อนเจ้าของ ลงทะเบียนครั้งแรกจึงต้องมีรหัสที่ admin ออกให้ผ่านช่องทางอื่นที่ไม่ใช่หน้า login
+  - admin = client ที่ประกาศ `admin: true` (service account ของเครื่องมือผู้ดูแล แยกจาก backend ของเว็บ ต้องมี Audience mapper `mfa-service` เหมือนกัน)
+  - `POST /v1/users/{userId}/mfa/invite` -> `{code, expiresAt}` รหัส 10 ตัวอักษร ใช้ได้ครั้งเดียว อายุ `mfa.invite-ttl` (ค่าเริ่มต้น 30m)
+    เก็บเฉพาะ hash กรอกผิดครบ 5 ครั้งรหัสถูกยกเลิก (ต้องออกใหม่) ตอบ 409 ถ้า user มี MFA แล้ว
+  - `DELETE /v1/users/{userId}/mfa` reset MFA ของ user (เช่นทำเครื่องหาย) แล้วออกรหัสเชิญใหม่ได้
+  - ข้อแลกเปลี่ยน: ผู้ที่รู้รหัสผ่านและเดารหัสเชิญผิดซ้ำจะ "เผา" รหัสเชิญของ user ได้ (ไม่ได้ MFA ไป แต่ user ต้องขอใหม่)
+  - ตัวอย่างเครื่องมือ: `demo/mfa-admin.ps1`
+  - **ด่านของ endpoint admin (`AdminGuard`)**: นอกจาก token ของ client ที่ `admin: true` ต้องผ่านครบทุกข้อ
+    1. เรียกจาก IP ที่อยู่ใน `mfa.admin.allowed-cidrs` (เว้นว่าง = ปิดทั้งหมด; หลัง proxy ต้องตั้ง `server.forward-headers-strategy` และให้ proxy เป็นทางเดียวที่เข้าถึง service)
+    2. ส่ง header `X-Admin-Actor` (ชื่อผู้ดูแล 1-64 ตัวอักษร) เพื่อลงใน audit log **ค่านี้ผู้เรียกระบุเอง ไม่ได้พิสูจน์ตัวตน**
+       client secret ตัวเดียวแยกคนไม่ได้ ถ้าต้องการพิสูจน์รายคนต้องให้ผู้ดูแลแต่ละคนมี service account (client `admin: true`) ของตัวเอง
+    3. ไม่เกิน `mfa.admin.max-per-hour` (20) ครั้ง/client/ชนิดเหตุการณ์/ชั่วโมง (ออกรหัสเชิญ กับ reset นับแยกกัน)
+  - **audit log**: ตาราง `mfa_audit` (เพิ่มอย่างเดียว ให้สิทธิ์ INSERT/SELECT เท่านั้น แล้วส่งออกไปเก็บที่อื่นด้วย) และ logger `mfa.audit`
+    เหตุการณ์: `INVITE_ISSUED`, `MFA_RESET`, `INVITE_REJECTED`, `ENROLL_STARTED`, `ENROLL_CONFIRMED` (การปฏิเสธของ admin เขียนลง log เป็น `admin-denied` ไม่ลงตาราง)
+    ยังไม่มีการแจ้งเตือนอัตโนมัติ ต้องตั้ง alert เองจาก log/ตาราง (เช่น `INVITE_REJECTED` ถี่ผิดปกติ, `admin-denied`)
+  - **ยังไม่มี**: การอนุมัติสองชั้น (คนหนึ่งขอ อีกคนอนุมัติ) และการพิสูจน์ตัวตนรายคนของผู้ดูแล
 - **หลักฐานของ user (`X-User-Token`)**: starter แนบ token ของ user ไปกับทุก request เอง service ตรวจลายเซ็นและดูว่าเป็นของ `userId` ที่ขอ
   - user ของ Keycloak: access token ต้องมี `azp` = client-id ของ backend ถ้า token ของ user ออกโดย client อื่นของ realm เดียวกัน
     (เช่นเว็บที่ใช้ wrapper เดิมกับ client อีกตัว) ให้ใส่ไว้ใน `login-client-ids` ของ client นั้น
@@ -131,7 +149,9 @@ kcmfa:
 challenge และสถานะ OAuth จะเก็บใน Redis ทุก instance เห็นร่วมกัน ไม่ต้องใช้ sticky session
 - ต้องใช้ Redis 6.2+ (คำสั่ง `GETDEL`) เมื่อเปิด `kcmfa.oauth`
 - key ขึ้นต้นด้วย `kcmfa:{client-id}:` เปลี่ยนได้ด้วย `kcmfa.redis-key-prefix` **ห้ามซ้ำกันระหว่างเว็บที่ใช้ Redis ร่วมกัน**
-- token ของ user อยู่ใน Redis ระหว่างรอ OTP (ไม่เกิน `challenge-ttl` + 10 นาที): Redis ต้องเปิด auth + TLS
+- token ของ user อยู่ใน Redis ระหว่างรอ OTP (ไม่เกิน `challenge-ttl` + 10 นาที) จึง**ถูกเข้ารหัส AES-256-GCM เสมอ** ด้วย `kcmfa.redis-encryption-key`
+  (base64 32 bytes: `openssl rand -base64 32`; ผูกกับ key ของ Redis ย้ายค่าไปสวม key อื่นไม่ได้) ไม่ตั้งคีย์ = เว็บ start ไม่ขึ้น
+  ยกเว้นตั้ง `kcmfa.redis-allow-plaintext: true` เอง ยังไม่รองรับหมุนคีย์ (เปลี่ยนคีย์แล้ว challenge ที่ค้างอยู่ต้อง login ใหม่) และ Redis ควรเปิด auth + TLS อยู่ดี
 - challenge ที่หมดอายุยังถูก revoke session เหมือนแบบ in-memory (instance เดียวเท่านั้นที่ได้ทำ ไม่ซ้ำกัน)
 - การนับครั้งที่กรอกผิดเป็น atomic (`INCR`) ยิงพร้อมกันหลาย instance ก็ไม่เกิน `max-attempts`
 - ตั้ง `store: redis` แต่ไม่มี dependency ของ Redis: เว็บจะ start ไม่ขึ้น (ไม่ตกไปใช้ in-memory เงียบๆ)
@@ -170,12 +190,22 @@ LoginFlow.LoginResult r = loginFlow.afterPassword(username, tokens);
 - ผ่าน OTP ครั้งเดียว/โค้ดเดียว (กัน replay), lockout ต่อ user, จำกัดครั้งต่อ challenge
 - MFA service ล่ม = login ไม่ผ่าน (fail-closed) และ revoke session ที่ Keycloak ที่เพิ่งเปิด
 
+- ลงทะเบียน MFA ครั้งแรกต้องมีรหัสเชิญจาก admin ไม่ใช่แค่รหัสผ่าน (เปิดโดยปริยายเมื่อ `enforce: true`); admin แยกเป็น client ของตัวเอง
+  จำกัด IP, ต้องระบุผู้ดูแล, จำกัดจำนวนครั้งต่อชั่วโมง และมี audit log
+- token ที่เก็บใน Redis เข้ารหัส AES-GCM และ start ไม่ขึ้นถ้าไม่ตั้งคีย์
+
+## ข้อจำกัดที่ยอมรับ / ต้องแก้ที่ชั้นอื่น
+- **lockout เป็นช่องทางทำให้ user ใช้งานไม่ได้**: ผู้ที่รู้รหัสผ่านกรอก OTP ผิดจนบัญชีถูกล็อกได้ (`lock-after-failures`, `lock-duration`)
+  เป็นข้อแลกเปลี่ยนกับการกัน brute-force รหัส 6 หลัก ผู้โจมตีต้องผ่านรหัสผ่านก่อน จึงไม่ใช่ช่องโหว่ที่เข้าถึงบัญชีได้
+- **rate limit ที่แท้จริงต้องอยู่ที่ gateway / Keycloak**: limiter ใน demo เป็น in-memory ของ instance เดียว (นับทั้งต่อ IP และต่อชื่อผู้ใช้)
+  หลาย instance หรือหลัง proxy ที่ไม่ได้ตั้ง `forward-headers-strategy` ใช้ไม่ได้ผล ให้เปิด brute-force detection ของ Keycloak และ rate limit ที่ gateway
+- **Keycloak ในชุด docker เป็น `start-dev` (HTTP)**: production ต้องมี TLS และ hostname ที่ตั้งค่าแล้ว
+
 ## ยังต้องทำก่อน production
 - ทดสอบ Redis store กับ Redis จริง (เทสต์ตอนนี้ใช้ Redis จำลอง) และทดสอบ migration กับ PostgreSQL จริง
 - ทดสอบโหลด (ไม่ได้วัดไว้) และปรับ `MFA_DB_POOL_SIZE` จากผลที่ได้
-- ส่ง token เป็น httpOnly+Secure cookie, CSRF, rate limit ต่อ IP ที่ gateway
-- Recovery codes และ endpoint reset MFA สำหรับ admin (`MfaService.reset` มีแล้วแต่ยังไม่เปิดเป็น API โดยตั้งใจ)
-  ควรมี role แยกและ audit log
+- ส่ง token เป็น httpOnly+Secure cookie, CSRF, rate limit ต่อ IP ที่ gateway (demo-backend ทำ cookie + rate limit ในเครื่องให้ดูเป็นตัวอย่าง)
+- Recovery codes, การอนุมัติสองชั้นของ admin, การแจ้งเตือนจาก audit log, และ export audit ไปที่เก็บที่แก้ไม่ได้
 - การเปิด/เปลี่ยน MFA หลัง login แล้ว (ตอนนี้ enroll ทำได้เฉพาะตอน login เมื่อเว็บตั้ง `enforce: true`)
 - เพิ่ม audit log (realm, azp, userId, ผล) ใน mfa-service
 
@@ -184,6 +214,6 @@ LoginFlow.LoginResult r = loginFlow.afterPassword(username, tokens);
 ตรวจ syntax ด้วย javac แล้ว (ไม่พบ syntax error) แต่ยังไม่ผ่านการ type-check กับ library จริง
 รัน `mvn test` ที่ root ก่อนใช้งาน เทสต์มี: AES-GCM, TOTP (รวม RFC 6238 vector), otpauth URI, Caller (iss/azp), LoginFlow (fail-closed, challenge, lockout),
 OAuthLoginFlow (state/cookie binding, PKCE, nonce/aud, userinfo, fail-closed, sweep), UserTokenVerifier (เจ้าของ token, azp, provider ภายนอก)
-เทสต์ของ starter (29 เคส รวม Redis store กับ Redis จำลอง) เคยรันผ่านแบบ offline กับ Spring 6.0.9 / Boot 3.1.0 โดยใช้ stub แทนคลาสที่ใช้ `RestClient`
+เทสต์ของ starter (36 เคส รวม Redis store กับ Redis จำลอง, เข้ารหัสค่าใน Redis, รหัสเชิญ) เคยรันผ่านแบบ offline กับ Spring 6.0.9 / Boot 3.1.0 โดยใช้ stub แทนคลาสที่ใช้ `RestClient`
 (`KeycloakClient`, `ExternalOAuthClient`, `MfaServiceClient`, `Http`) สี่คลาสนี้และ mfa-service ทั้ง module ยังไม่เคย compile กับ library จริง
 จุดที่ควรดูก่อนถ้า compile ไม่ผ่าน: constructor/method ของ `java-otp` 0.4.0 และ `Jwt.Builder.issuer(...)` ในเทสต์

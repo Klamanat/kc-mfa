@@ -1,0 +1,113 @@
+{
+  "realm": "brand-a",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "users": [
+    {
+      "username": "demo",
+      "enabled": true,
+      "email": "demo@example.test",
+      "emailVerified": true,
+      "firstName": "Demo",
+      "lastName": "User",
+      "credentials": [
+        { "type": "password", "value": "__DEMO_USER_PASSWORD__", "temporary": false }
+      ]
+    },
+    {
+      "username": "service-account-web1-backend",
+      "enabled": true,
+      "serviceAccountClientId": "web1-backend",
+      "realmRoles": ["default-roles-brand-a"]
+    },
+    {
+      "username": "service-account-mfa-admin",
+      "enabled": true,
+      "serviceAccountClientId": "mfa-admin",
+      "realmRoles": ["default-roles-brand-a"]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "web1-backend",
+      "name": "Web1 backend (demo)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "__WEB1_CLIENT_SECRET__",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "mfa-service-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "mfa-service",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "Client ID",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "client_id",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "client_id",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "mfa-admin",
+      "name": "MFA admin tool (demo): ออกรหัสเชิญ / reset MFA",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "__MFA_ADMIN_SECRET__",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "mfa-service-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "mfa-service",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "Client ID",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.session.note": "client_id",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "client_id",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -15,7 +15,7 @@ import jakarta.validation.constraints.Size;
  * Endpoint สำหรับหน้าเว็บ (path เปลี่ยนได้ด้วย kcmfa.base-path)
  *   POST login                {username,password}
  *   POST mfa/verify           {challengeId, code}
- *   POST mfa/enroll/start     {challengeId}
+ *   POST mfa/enroll/start     {challengeId, inviteCode?}
  *   POST mfa/enroll/confirm   {challengeId, code}
  *
  * production: ส่ง tokens เป็น httpOnly+Secure cookie แทน JSON body และใส่ CSRF + rate limit ต่อ IP
@@ -28,6 +28,8 @@ public class KcMfaAuthController {
     public record LoginRequest(@NotBlank @Size(max = 256) String username,
                                @NotBlank @Size(max = 1024) String password) {}
     public record ChallengeRequest(@NotBlank @Size(max = 128) String challengeId) {}
+    public record EnrollStartRequest(@NotBlank @Size(max = 128) String challengeId,
+                                     @Size(max = 32) String inviteCode) {}
     public record CodeRequest(@NotBlank @Size(max = 128) String challengeId,
                               @NotBlank @Size(max = 16) String code) {}
 
@@ -48,8 +50,8 @@ public class KcMfaAuthController {
     }
 
     @PostMapping("/mfa/enroll/start")
-    public MfaServiceClient.EnrollStart enrollStart(@Valid @RequestBody ChallengeRequest req) {
-        return flow.enrollStart(req.challengeId());
+    public MfaServiceClient.EnrollStart enrollStart(@Valid @RequestBody EnrollStartRequest req) {
+        return flow.enrollStart(req.challengeId(), req.inviteCode());
     }
 
     @PostMapping("/mfa/enroll/confirm")

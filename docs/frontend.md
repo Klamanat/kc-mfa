@@ -9,6 +9,7 @@
 | 1. Login | เสมอ | กรอก username/password |
 | 2. กรอก OTP | `status = MFA_REQUIRED` | กรอกโค้ด 6 หลักจากแอป |
 | 3. ตั้งค่า MFA ครั้งแรก (QR) | `status = ENROLL_REQUIRED` | สแกน QR แล้วกรอกโค้ดยืนยัน |
+| 3a. ใส่รหัสเชิญ (ก่อนหน้า 3) | `status = ENROLL_INVITE_REQUIRED` | ใส่รหัสเชิญที่ admin ออกให้ แล้วส่งไป `/mfa/enroll/start` พร้อม `inviteCode` (ผิด = 403) |
 
 ## State machine
 
@@ -16,6 +17,7 @@
 Login ──POST /login──> status?
    ├─ OK               -> เข้าระบบ (เว็บที่ไม่บังคับ MFA และ user ยังไม่มี MFA)
    ├─ MFA_REQUIRED     -> หน้า OTP        ──POST /mfa/verify──> tokens -> เข้าระบบ
+   ├─ ENROLL_INVITE_REQUIRED -> หน้ารหัสเชิญ ──POST /mfa/enroll/start {inviteCode}──> แสดง QR (ต่อด้านล่าง)
    └─ ENROLL_REQUIRED  -> หน้า QR  ──POST /mfa/enroll/start──> แสดง QR
                                     ──POST /mfa/enroll/confirm──> tokens -> เข้าระบบ
 ```
@@ -69,7 +71,8 @@ export const oauthResult = () => api<LoginResult>("/oauth/result", {});
 type LoginResult =
   | { status: "OK"; tokens: Tokens }
   | { status: "MFA_REQUIRED"; challengeId: string }
-  | { status: "ENROLL_REQUIRED"; challengeId: string };
+  | { status: "ENROLL_REQUIRED"; challengeId: string }
+  | { status: "ENROLL_INVITE_REQUIRED"; challengeId: string };
 
 async function api<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`/api/auth${path}`, {

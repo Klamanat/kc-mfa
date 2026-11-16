@@ -1,0 +1,98 @@
+# ชุดทดลองในเครื่อง: Postgres + Keycloak + mfa-service + demo-backend
+# ใช้:  copy .env.example .env  (แล้วใส่ค่าทุกช่อง)  →  docker compose up --build
+# เปิด http://localhost:8080  (login: demo / ค่า DEMO_USER_PASSWORD)   Keycloak admin: http://localhost:8180
+# ผู้ใช้ใหม่ต้องมีรหัสเชิญก่อนลงทะเบียน MFA: ดู demo/mfa-admin.ps1
+# ทุก port ผูกกับ 127.0.0.1 เท่านั้น และ Keycloak รันแบบ start-dev (HTTP) ชุดนี้ใช้ในเครื่องเท่านั้น ห้ามนำไป deploy
+# ค่าลับทั้งหมดมาจาก .env (ไม่มีค่าลับเขียนอยู่ในไฟล์ใน repo)
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: mfa
+      POSTGRES_USER: mfa
+      POSTGRES_PASSWORD: ${MFA_DB_PASSWORD:?ตั้งใน .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mfa -d mfa"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.5
+    # แทนค่า __NAME__ ในไฟล์ realm ด้วยค่าจาก .env ก่อนเริ่ม (ไม่พึ่งการแทน ${...} ของ Keycloak) แล้ว import
+    # ค่าลับต้องเป็นตัวอักษร A-Z a-z 0-9 + / = _ - . เท่านั้น ห้ามมี & " \ (ค่าที่สร้างด้วยคำสั่งใน .env.example เป็นแบบนี้)
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        mkdir -p /opt/keycloak/data/import
+        # bash ล้วน (image ของ Keycloak เป็น ubi-micro ไม่มี sed)
+        c="$$(< /realm-template/brand-a-realm.json)"
+        c="$${c//__DEMO_USER_PASSWORD__/$$DEMO_USER_PASSWORD}"
+        c="$${c//__WEB1_CLIENT_SECRET__/$$WEB1_CLIENT_SECRET}"
+        c="$${c//__MFA_ADMIN_SECRET__/$$MFA_ADMIN_SECRET}"
+        printf '%s\n' "$$c" > /opt/keycloak/data/import/brand-a-realm.json
+        exec /opt/keycloak/bin/kc.sh start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?ตั้งใน .env}
+      # ใช้แทนค่า __NAME__ ใน demo/keycloak/brand-a-realm.json (ดู entrypoint ด้านบน)
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:?ตั้งใน .env}
+      WEB1_CLIENT_SECRET: ${WEB1_CLIENT_SECRET:?ตั้งใน .env}
+      MFA_ADMIN_SECRET: ${MFA_ADMIN_SECRET:?ตั้งใน .env}
+    volumes:
+      - ./demo/keycloak:/realm-template:ro
+    ports:
+      - "127.0.0.1:8180:8080"
+    healthcheck:
+      # image ไม่มี curl: เช็กแค่ว่า port เปิดแล้ว (import realm เสร็จก่อนเปิด port)
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+
+  mfa-service:
+    build:
+      context: .
+      args:
+        MODULE: mfa-service
+    depends_on:
+      postgres: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+    environment:
+      MFA_DB_URL: jdbc:postgresql://postgres:5432/mfa
+      MFA_DB_USER: mfa
+      MFA_DB_PASSWORD: ${MFA_DB_PASSWORD}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?ตั้งใน .env}
+      SPRING_CONFIG_ADDITIONAL_LOCATION: file:/config/
+    volumes:
+      - ./demo/mfa-service.yml:/config/application.yml:ro
+    ports:
+      # เปิดให้เครื่องมือผู้ดูแล (demo/mfa-admin.ps1) เรียกจากเครื่องนี้เท่านั้น; ทุก endpoint ต้องมี Bearer token อยู่ดี
+      - "127.0.0.1:8090:8090"
+
+  demo-backend:
+    build:
+      context: .
+      args:
+        MODULE: demo-backend
+    depends_on:
+      mfa-service: { condition: service_started }
+      keycloak: { condition: service_healthy }
+    environment:
+      KC_BASE_URL: http://keycloak:8080
+      KC_ISSUER_URI: http://keycloak:8080/realms/brand-a
+      KC_REALM: brand-a
+      KC_CLIENT_ID: web1-backend
+      KC_CLIENT_SECRET: ${WEB1_CLIENT_SECRET}
+      MFA_SERVICE_URL: http://mfa-service:8090
+      # cookie ปกติเป็น Secure (HTTPS เท่านั้น); ชุดนี้เสิร์ฟ http://localhost จึงปิดไว้เฉพาะที่นี่ ห้ามคัดลอกไปใช้จริง
+      DEMO_COOKIE_SECURE: "false"
+    ports:
+      - "127.0.0.1:8080:8080"
+
+volumes:
+  pgdata:

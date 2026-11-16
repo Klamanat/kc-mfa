@@ -11,14 +11,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class PendingCleanup {
 
     private final MfaPendingRepository pendingRepo;
+    private final MfaInviteRepository inviteRepo;
 
-    public PendingCleanup(MfaPendingRepository pendingRepo) {
+    public PendingCleanup(MfaPendingRepository pendingRepo, MfaInviteRepository inviteRepo) {
         this.pendingRepo = pendingRepo;
+        this.inviteRepo = inviteRepo;
     }
 
     @Scheduled(fixedDelayString = "PT10M", initialDelayString = "PT1M")
     @Transactional
     public void run() {
-        pendingRepo.deleteExpired(Instant.now());
+        Instant now = Instant.now();
+        pendingRepo.deleteExpired(now);
+        inviteRepo.deleteExpired(now);
     }
 }

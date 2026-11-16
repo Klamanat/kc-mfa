@@ -1,0 +1,25 @@
+server:
+  port: 8080
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # iss ของ realm ที่เว็บนี้ใช้ (ต้องตรงกับ iss ใน token เป๊ะ)
+          issuer-uri: ${KC_ISSUER_URI:http://localhost:8180/realms/brand-a}
+
+demo:
+  cookie-secure: ${DEMO_COOKIE_SECURE:true}    # ตั้ง false เฉพาะตอนลองบน http://localhost
+  rate-limit: 10                               # ครั้ง/IP/นาที (แยกกลุ่ม login กับ otp)
+
+kcmfa:
+  controller:
+    enabled: false                             # ใช้ AuthController ของ demo แทนของ starter
+  keycloak:
+    base-url: ${KC_BASE_URL:http://localhost:8180}
+    realm: ${KC_REALM:brand-a}
+    client-id: ${KC_CLIENT_ID:web1-backend}
+    client-secret: ${KC_CLIENT_SECRET}        # ส่งผ่าน environment variable อย่าเขียนลงไฟล์
+  mfa-service:
+    url: ${MFA_SERVICE_URL:http://localhost:8090}

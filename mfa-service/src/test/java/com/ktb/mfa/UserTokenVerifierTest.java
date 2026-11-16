@@ -24,7 +24,8 @@ class UserTokenVerifierTest {
     private final MfaProps.Client client = new MfaProps.Client("brand-a", "web1-backend", true, "Brand A",
             List.of("web1-frontend"),
             List.of(new MfaProps.ExternalProvider("google", GOOGLE, "google-client-id"),
-                    new MfaProps.ExternalProvider("github", null, null)));
+                    new MfaProps.ExternalProvider("github", null, null)),
+            false, false);
 
     /** token ปลอม: "issuer-ที่ออก|json-ไม่ใช้" -> ตัวถอดจำลองคืน Jwt ที่เตรียมไว้ตาม token value */
     private final Map<String, Jwt> issued = new HashMap<>();

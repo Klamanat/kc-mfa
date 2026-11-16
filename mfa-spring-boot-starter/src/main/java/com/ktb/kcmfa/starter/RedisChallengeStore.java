@@ -27,7 +27,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * (LoginFlow ตรวจ expiresAt เองทุกครั้ง challenge ที่หมดอายุแล้วจึงใช้ไม่ได้แม้ key ยังอยู่)
  * instance ที่ ZREM สำเร็จเท่านั้นที่ได้ challenge ไป จึง revoke ไม่ซ้ำกัน
  *
- * token ของ user ถูกเก็บใน Redis ระหว่างรอ OTP: Redis ต้องเปิด auth + TLS และไม่ใช้ร่วมกับระบบที่ไม่เกี่ยวข้อง
+ * token ของ user ถูกเก็บใน Redis ระหว่างรอ OTP: ค่าถูกเข้ารหัส AES-GCM ด้วย kcmfa.redis-encryption-key (PayloadCipher)
+ * Redis ยังควรเปิด auth + TLS และไม่ใช้ร่วมกับระบบที่ไม่เกี่ยวข้อง
  */
 public class RedisChallengeStore implements ChallengeStore {
 
@@ -41,11 +42,17 @@ public class RedisChallengeStore implements ChallengeStore {
 
     private final StringRedisTemplate redis;
     private final String prefix;
+    private final PayloadCipher cipher;      // null = เก็บเป็นข้อความล้วน (เฉพาะทดสอบ / ตั้ง kcmfa.redis-allow-plaintext เอง)
     private final SecureRandom random = new SecureRandom();
 
     public RedisChallengeStore(StringRedisTemplate redis, String prefix) {
+        this(redis, prefix, null);
+    }
+
+    public RedisChallengeStore(StringRedisTemplate redis, String prefix, PayloadCipher cipher) {
         this.redis = redis;
         this.prefix = prefix;
+        this.cipher = cipher;
     }
 
     @Override
@@ -56,14 +63,14 @@ public class RedisChallengeStore implements ChallengeStore {
         String id = Base64.getUrlEncoder().withoutPadding().encodeToString(b);
         Challenge c = new Challenge(id, type, userId, username, tokens, Instant.now().plus(ttl), external);
         Duration life = (ttl.isNegative() ? Duration.ZERO : ttl).plus(GRACE);
-        redis.opsForValue().set(key(id), write(c), life);
+        redis.opsForValue().set(key(id), seal(key(id), write(c)), life);
         redis.opsForZSet().add(expiryKey(), id, c.expiresAt.toEpochMilli());
         return c;
     }
 
     @Override
     public Optional<Challenge> find(String id) {
-        return id == null ? Optional.empty() : Optional.ofNullable(read(redis.opsForValue().get(key(id))));
+        return id == null ? Optional.empty() : Optional.ofNullable(read(open(key(id), redis.opsForValue().get(key(id)))));
     }
 
     @Override
@@ -106,13 +113,22 @@ public class RedisChallengeStore implements ChallengeStore {
             if (won == null || won == 0) {
                 continue;   // instance อื่นหยิบไปแล้ว หรือถูก remove() ไปก่อน
             }
-            Challenge c = read(redis.opsForValue().get(key(id)));
+            Challenge c = read(open(key(id), redis.opsForValue().get(key(id))));
             redis.delete(List.of(key(id), counterKey(id)));
             if (c != null) {
                 expired.add(c);
             }
         }
         return expired;
+    }
+
+    private String seal(String redisKey, String json) {
+        return cipher == null ? json : cipher.encrypt(json, redisKey);
+    }
+
+    /** ค่าที่ถอดรหัสไม่ได้ (ถูกแก้/ย้าย/คีย์เปลี่ยน) ถือว่าไม่มี challenge นี้ */
+    private String open(String redisKey, String stored) {
+        return cipher == null || stored == null ? stored : cipher.decrypt(stored, redisKey);
     }
 
     private String key(String id) {

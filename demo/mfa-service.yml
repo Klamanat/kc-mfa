@@ -1,0 +1,21 @@
+# config เพิ่มเติมของ mfa-service ในชุด docker (mount เป็น /config/application.yml)
+# list ที่ประกาศที่นี่แทนที่ list ใน application.yml ของ jar ทั้งก้อน
+# iss ที่ Keycloak ใส่ใน token มาจาก host ที่ผู้เรียกใช้ = keycloak:8080 ทุก container ต้องเรียกด้วย host นี้เหมือนกัน
+mfa:
+  trusted-issuers:
+    - http://keycloak:8080/realms/brand-a
+  invite-ttl: 30m
+  admin:
+    # เครื่องที่เรียก endpoint ของ admin ได้ (ไม่ตั้ง = ปิดทั้งหมด) ชุดนี้เรียกจากเครื่องตัวเองผ่าน Docker จึงเห็นเป็นเครือข่ายภายใน
+    # production: ใส่เฉพาะ IP/ช่วงของเครื่องมือ admin เช่น ["10.20.5.0/24"]
+    allowed-cidrs: ["127.0.0.1/32", "172.16.0.0/12", "192.168.0.0/16", "10.0.0.0/8"]
+    max-per-hour: 20
+  clients:
+    - realm: brand-a
+      client-id: web1-backend
+      enforce: true
+      # invite-required: ไม่ต้องตั้ง = ตาม enforce (enforce: true => ต้องมีรหัสเชิญจาก admin ก่อน enroll) ตั้ง false เองเท่านั้นจึงจะปิด
+      issuer-label: "Brand A (demo)"
+    - realm: brand-a
+      client-id: mfa-admin       # เครื่องมือของผู้ดูแล: ออกรหัสเชิญ / reset MFA (demo/mfa-admin.ps1)
+      admin: true

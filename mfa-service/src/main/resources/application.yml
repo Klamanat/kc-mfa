@@ -42,17 +42,30 @@ mfa:
   # (เวลาที่ user ใช้กรอก OTP / สแกน QR) ควร >= kcmfa.challenge-ttl ของเว็บ
   user-token-grace: 15m
 
+  invite-ttl: 30m              # อายุของรหัสเชิญที่ admin ออก (ใช้ได้ครั้งเดียว)
+
+  admin:
+    # IP/CIDR ที่เรียก endpoint ของ admin (ออกรหัสเชิญ / reset) ได้ เว้นว่าง = ปิดทั้งหมด
+    # หลัง reverse proxy ต้องตั้ง server.forward-headers-strategy และให้ proxy เป็นทางเดียวที่เข้า service ได้
+    allowed-cidrs: []
+    max-per-hour: 20           # ต่อ admin client ต่อชนิดเหตุการณ์ (นับจากตาราง mfa_audit)
+
   # allowlist ของ backend ที่เรียก service นี้ได้ = (realm, client-id) + policy ของเว็บนั้น
   clients:
     - realm: brand-a
       client-id: web1-backend
       enforce: true              # true = user ที่ยังไม่มี MFA ต้อง enroll ก่อนได้ token
       issuer-label: "Brand A"    # ชื่อที่แสดงในแอป Authenticator
+      # invite-required: ไม่ต้องตั้ง = ตาม enforce (enforce: true ต้องมีรหัสเชิญจาก admin ก่อน enroll; ตั้ง false เองเท่านั้นจึงจะปิด)
       # login-client-ids: [web1-frontend]   # ถ้า token ของ user ออกโดย client อื่นของ realm เดียวกัน
       # external-providers:                 # ถ้าเว็บเปิด kcmfa.oauth (provider ต้องตรงกับ kcmfa.oauth.provider)
       #   - provider: google
       #     issuer: https://accounts.google.com
       #     audience: <client-id ที่ลงทะเบียนกับ provider>
+    # client ของเครื่องมือผู้ดูแล (service account แยกจากเว็บ) ออกรหัสเชิญ / reset MFA ได้ ต้องมี Audience mapper mfa-service เหมือนกัน
+    # - realm: brand-a
+    #   client-id: mfa-admin
+    #   admin: true
     - realm: brand-b
       client-id: web2-backend
       enforce: false

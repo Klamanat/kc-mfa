@@ -11,7 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
- * login -> (MFA_REQUIRED | ENROLL_REQUIRED | OK)
+ * login -> (MFA_REQUIRED | ENROLL_REQUIRED | ENROLL_INVITE_REQUIRED | OK)
  * หลักการ: ถ้าเรียก MFA service ไม่ได้ ต้อง fail-closed (ไม่ปล่อย token) และ revoke session ที่เพิ่งเปิดที่ Keycloak
  */
 public class LoginFlow {
@@ -82,7 +82,8 @@ public class LoginFlow {
         }
         if (status.enforce()) {
             Challenge c = store.create(Challenge.Type.ENROLL, userId, username, tokens, props.challengeTtl(), external);
-            return new LoginResult("ENROLL_REQUIRED", c.id, null);
+            // ENROLL_INVITE_REQUIRED: หน้าเว็บต้องให้ user ใส่รหัสเชิญที่ admin ออกให้ก่อนเรียก enrollStart
+            return new LoginResult(status.inviteRequired() ? "ENROLL_INVITE_REQUIRED" : "ENROLL_REQUIRED", c.id, null);
         }
         return new LoginResult("OK", null, tokens);
     }
@@ -103,8 +104,22 @@ public class LoginFlow {
     }
 
     public MfaServiceClient.EnrollStart enrollStart(String challengeId) {
+        return enrollStart(challengeId, null);
+    }
+
+    /**
+     * inviteCode: รหัสเชิญที่ admin ออกให้ (จำเป็นเมื่อผลของ login เป็น ENROLL_INVITE_REQUIRED)
+     * รหัสผิดนับเป็นครั้งที่ผิดของ challenge นี้ ครบ kcmfa.max-attempts แล้วต้อง login ใหม่
+     */
+    public MfaServiceClient.EnrollStart enrollStart(String challengeId, String inviteCode) {
         Challenge c = require(challengeId, Challenge.Type.ENROLL);
-        Optional<MfaServiceClient.EnrollStart> r = call(() -> mfa.enrollStart(c.userId, c.username, proofOf(c.tokens, c.external)));
+        Optional<MfaServiceClient.EnrollStart> r;
+        try {
+            r = call(() -> mfa.enrollStart(c.userId, c.username, inviteCode, proofOf(c.tokens, c.external)));
+        } catch (InviteRejectedException e) {
+            failAttempt(c);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invalid invite code");
+        }
         if (r.isEmpty()) {
             discard(c);
             throw new ResponseStatusException(HttpStatus.CONFLICT, "MFA already enrolled");
@@ -164,6 +179,8 @@ public class LoginFlow {
     private <T> T call(Supplier<T> s) {
         try {
             return s.get();
+        } catch (InviteRejectedException e) {
+            throw e;      // ไม่ใช่ service ล่ม: ให้ผู้เรียกจัดการเอง
         } catch (RuntimeException e) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "MFA service unavailable", e);
         }

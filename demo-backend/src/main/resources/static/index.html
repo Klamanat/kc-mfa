@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>เข้าสู่ระบบ · kc-mfa</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <svg class="defs" width="0" height="0" aria-hidden="true">
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.4 8.2-8 9-4.6-.8-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0112 5c6.4 0 10 7 10 7a17 17 0 01-3.2 4M6.5 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7c1.7 0 3.2-.4 4.5-1"/><path d="M9.9 9.9a3 3 0 004.2 4.2"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16h.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.2-3.6 4.2-5 8-5s6.8 1.4 8 5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M10 16l-4-4 4-4M6 12h10"/></symbol>
+  </svg>
+
+  <!-- ===== ยืนยันตัวตน ===== -->
+  <div class="auth" id="auth-view">
+    <section class="hero" aria-label="เกี่ยวกับระบบ">
+      <div class="logo"><span class="mark"><svg><use href="#i-shield"/></svg></span> kc-mfa</div>
+      <div>
+        <h1>เข้าสู่ระบบอย่างปลอดภัย<br>ด้วยการยืนยัน 2 ขั้นตอน</h1>
+        <p>บัญชีของคุณได้รับการปกป้องด้วยรหัสผ่านและรหัสใช้ครั้งเดียวจากแอป Google Authenticator</p>
+        <ul class="points">
+          <li><svg><use href="#i-lock"/></svg><span>รหัสผ่านตรวจกับ Keycloak โดยตรง</span></li>
+          <li><svg><use href="#i-phone"/></svg><span>รหัส 6 หลักเปลี่ยนทุก 30 วินาที ไม่ต้องใช้อินเทอร์เน็ตบนมือถือ</span></li>
+          <li><svg><use href="#i-shield"/></svg><span>ผิดหลายครั้งบัญชีจะถูกล็อกชั่วคราว</span></li>
+        </ul>
+      </div>
+      <small>ชุดทดลองสำหรับ kc-mfa</small>
+    </section>
+
+    <div class="pane">
+      <div class="card">
+        <ol class="steps" id="steps" aria-label="ขั้นตอน">
+          <li data-step="1">รหัสผ่าน</li>
+          <li data-step="2">ยืนยันตัวตน</li>
+        </ol>
+
+        <!-- 1. login -->
+        <form id="s-login" novalidate>
+          <h2>เข้าสู่ระบบ</h2>
+          <p class="lead">ใช้บัญชี Keycloak ของคุณ (ชุดทดลอง: demo / demo)</p>
+          <div id="err-login" class="msg err" role="alert" hidden><svg><use href="#i-alert"/></svg><span></span></div>
+          <div class="field">
+            <label for="username">ชื่อผู้ใช้</label>
+            <input class="text" id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+          </div>
+          <div class="field">
+            <label for="password">รหัสผ่าน</label>
+            <input class="text pw" id="password" name="password" type="password" autocomplete="current-password" required>
+            <button type="button" class="eye" id="toggle-pw" aria-label="แสดงรหัสผ่าน" aria-pressed="false">
+              <svg><use href="#i-eye"/></svg>
+            </button>
+          </div>
+          <button class="btn" id="btn-login" type="submit">เข้าสู่ระบบ</button>
+        </form>
+
+        <!-- 2a. ใส่รหัสจากแอป -->
+        <form id="s-verify" novalidate hidden>
+          <h2>ใส่รหัสยืนยัน</h2>
+          <p class="lead">เปิดแอป Google Authenticator แล้วใส่รหัส 6 หลักของบัญชีนี้</p>
+          <div id="err-verify" class="msg err" role="alert" hidden><svg><use href="#i-alert"/></svg><span></span></div>
+          <div class="otp" id="otp-verify" role="group" aria-label="รหัส 6 หลัก"></div>
+          <button class="btn" id="btn-verify" type="submit">ยืนยัน</button>
+          <p class="foot"><button type="button" class="btn link" data-back>กลับไปหน้าเข้าสู่ระบบ</button></p>
+        </form>
+
+        <!-- 2b-0. รหัสเชิญจาก admin (เฉพาะเว็บที่เปิด invite-required) -->
+        <form id="s-invite" novalidate hidden>
+          <h2>ใส่รหัสเชิญ</h2>
+          <p class="lead">บัญชีนี้ยังไม่ได้ตั้งค่าการยืนยัน 2 ขั้นตอน ขอรหัสเชิญจากผู้ดูแลระบบ แล้วใส่ที่นี่เพื่อเริ่มตั้งค่า</p>
+          <div id="err-invite" class="msg err" role="alert" hidden><svg><use href="#i-alert"/></svg><span></span></div>
+          <div class="field">
+            <label for="invite">รหัสเชิญ</label>
+            <input class="text" id="invite" name="invite" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="32" placeholder="XXXXX-XXXXX" required>
+          </div>
+          <button class="btn" id="btn-invite" type="submit">ดำเนินการต่อ</button>
+          <p class="foot"><button type="button" class="btn link" data-back>ยกเลิก</button></p>
+        </form>
+
+        <!-- 2b. ลงทะเบียนครั้งแรก -->
+        <form id="s-enroll" novalidate hidden>
+          <h2>ตั้งค่าการยืนยัน 2 ขั้นตอน</h2>
+          <p class="lead">บัญชีนี้ต้องเปิดใช้งานก่อนเข้าระบบ ใช้เวลาไม่ถึงนาที</p>
+          <ol class="how">
+            <li><span>ติดตั้งแอป <b>Google Authenticator</b> บนมือถือ</span></li>
+            <li><span>เลือก <b>เพิ่มบัญชี → สแกน QR</b> แล้วสแกนภาพด้านล่าง</span></li>
+            <li><span>ใส่รหัส 6 หลักที่แอปแสดง</span></li>
+          </ol>
+          <div class="qr"><div class="frame"><img id="qr" alt="QR Code สำหรับเพิ่มบัญชีใน Google Authenticator" width="196" height="196"></div></div>
+          <details>
+            <summary>สแกนไม่ได้? ป้อนคีย์ด้วยตนเอง</summary>
+            <code id="secret" class="secret"></code>
+          </details>
+          <div id="err-enroll" class="msg err" role="alert" hidden><svg><use href="#i-alert"/></svg><span></span></div>
+          <div class="otp" id="otp-enroll" role="group" aria-label="รหัส 6 หลัก"></div>
+          <button class="btn" id="btn-enroll-confirm" type="submit">ยืนยันและเข้าสู่ระบบ</button>
+          <p class="foot"><button type="button" class="btn link" data-back>ยกเลิก</button></p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== แดชบอร์ด ===== -->
+  <div class="app" id="app-view" hidden>
+    <header class="bar">
+      <div class="in">
+        <div class="logo"><span class="mark"><svg><use href="#i-shield"/></svg></span> kc-mfa</div>
+        <div class="who">
+          <span class="avatar" id="avatar" aria-hidden="true">?</span>
+          <span id="who-name" class="sr-only"></span>
+          <button class="btn secondary" id="btn-logout" type="button"><svg><use href="#i-logout"/></svg>ออกจากระบบ</button>
+        </div>
+      </div>
+    </header>
+    <main>
+      <h1 id="hello">ยินดีต้อนรับ</h1>
+      <p class="lead">คุณเข้าสู่ระบบแล้ว และผ่านการยืนยัน 2 ขั้นตอน</p>
+      <div id="err-app" class="msg err" role="alert" hidden><svg><use href="#i-alert"/></svg><span></span></div>
+
+      <div class="grid">
+        <div class="tile"><div class="k"><svg><use href="#i-user"/></svg>ผู้ใช้</div><div class="v" id="t-user"><div class="skeleton"></div></div></div>
+        <div class="tile"><div class="k"><svg><use href="#i-shield"/></svg>การยืนยัน 2 ขั้นตอน</div><div class="v ok" id="t-mfa">ผ่านแล้ว</div></div>
+        <div class="tile"><div class="k"><svg><use href="#i-clock"/></svg>เซสชันหมดอายุ</div><div class="v" id="t-exp"><div class="skeleton"></div></div></div>
+      </div>
+
+      <section class="panel" aria-labelledby="h-orders">
+        <h3 id="h-orders">ข้อมูลจาก API ที่ถูกป้องกัน (/api/orders)</h3>
+        <div id="orders"><div class="skeleton"></div></div>
+      </section>
+      <section class="panel" aria-labelledby="h-me">
+        <h3 id="h-me">รายละเอียด token (/api/me)</h3>
+        <table><tbody id="me-rows"></tbody></table>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

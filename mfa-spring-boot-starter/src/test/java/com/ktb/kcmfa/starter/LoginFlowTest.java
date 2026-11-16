@@ -42,7 +42,7 @@ class LoginFlowTest {
                 new KcMfaProperties.Keycloak("http://kc/auth", "realm", "client", "secret"),
                 new KcMfaProperties.MfaService("http://mfa"),
                 Duration.ofMinutes(5), 2,
-                Duration.ofSeconds(2), Duration.ofSeconds(5), Duration.ofSeconds(30), null, "memory", null);
+                Duration.ofSeconds(2), Duration.ofSeconds(5), Duration.ofSeconds(30), null, "memory", null, null, false);
         flow = new LoginFlow(kc, mfa, new InMemoryChallengeStore(), props);
         when(kc.passwordGrant("john", "pw")).thenReturn(Optional.of(tokens()));
     }
@@ -53,7 +53,7 @@ class LoginFlowTest {
 
     @Test
     void returnsTokensWhenNoMfaAndNotEnforced() {
-        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(false, false));
+        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(false, false, false));
         LoginFlow.LoginResult r = flow.login("john", "pw");
         assertEquals("OK", r.status());
         assertNotNull(r.tokens());
@@ -61,7 +61,7 @@ class LoginFlowTest {
 
     @Test
     void requiresMfaWhenEnrolledAndHoldsTokens() {
-        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(true, false));
+        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(true, false, false));
         LoginFlow.LoginResult r = flow.login("john", "pw");
         assertEquals("MFA_REQUIRED", r.status());
         assertNotNull(r.challengeId());
@@ -70,8 +70,36 @@ class LoginFlowTest {
 
     @Test
     void requiresEnrollmentWhenEnforcedAndNotEnrolled() {
-        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(false, true));
+        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(false, true, false));
         assertEquals("ENROLL_REQUIRED", flow.login("john", "pw").status());
+    }
+
+    @Test
+    void reportsInviteRequiredWhenServiceDemandsInviteForFirstEnrollment() {
+        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(false, true, true));
+        assertEquals("ENROLL_INVITE_REQUIRED", flow.login("john", "pw").status());
+    }
+
+    @Test
+    void wrongInviteIs403CountsAttemptsAndEndsChallengeWithRevoke() {
+        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(false, true, true));
+        when(mfa.enrollStart(eq("u1"), any(), eq("BAD"), any())).thenThrow(new InviteRejectedException(null));
+        String id = flow.login("john", "pw").challengeId();
+
+        assertEquals(403, statusOf(() -> flow.enrollStart(id, "BAD")));
+        verify(kc, never()).logout("r1");
+        assertEquals(403, statusOf(() -> flow.enrollStart(id, "BAD")));     // max-attempts = 2: ครั้งที่สองปิด challenge
+        verify(kc).logout("r1");
+        assertEquals(401, statusOf(() -> flow.enrollStart(id, "BAD")));
+    }
+
+    @Test
+    void validInviteIsForwardedToService() {
+        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(false, true, true));
+        when(mfa.enrollStart(eq("u1"), eq("john"), eq("ABCDE-FGHJK"), any()))
+                .thenReturn(Optional.of(new MfaServiceClient.EnrollStart("SECRET", "otpauth://totp/x")));
+        String id = flow.login("john", "pw").challengeId();
+        assertEquals("SECRET", flow.enrollStart(id, "ABCDE-FGHJK").secret());
     }
 
     @Test
@@ -90,7 +118,7 @@ class LoginFlowTest {
 
     @Test
     void verifyReleasesTokensOnlyOnce() {
-        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(true, false));
+        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(true, false, false));
         when(mfa.verify(eq("u1"), eq("123456"), any())).thenReturn(MfaResult.OK);
         String id = flow.login("john", "pw").challengeId();
 
@@ -100,7 +128,7 @@ class LoginFlowTest {
 
     @Test
     void tooManyBadCodesDiscardChallengeAndRevokeSession() {
-        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(true, false));
+        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(true, false, false));
         when(mfa.verify(eq("u1"), eq("000000"), any())).thenReturn(MfaResult.BAD_CODE);
         String id = flow.login("john", "pw").challengeId();
 
@@ -113,7 +141,7 @@ class LoginFlowTest {
 
     @Test
     void afterPasswordWorksWithTokensFromExistingWrapper() {
-        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(true, false));
+        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(true, false, false));
         LoginFlow.LoginResult r = flow.afterPassword("john", tokens());
         assertEquals("MFA_REQUIRED", r.status());
         assertNotNull(r.challengeId());
@@ -130,7 +158,7 @@ class LoginFlowTest {
     @Test
     void sendsUsersAccessTokenAsProofOnEveryCall() {
         String accessToken = (String) tokens().get("access_token");
-        when(mfa.status("u1", accessToken)).thenReturn(new MfaServiceClient.Status(true, false));
+        when(mfa.status("u1", accessToken)).thenReturn(new MfaServiceClient.Status(true, false, false));
         when(mfa.verify("u1", "123456", accessToken)).thenReturn(MfaResult.OK);
 
         String id = flow.login("john", "pw").challengeId();
@@ -139,7 +167,7 @@ class LoginFlowTest {
 
     @Test
     void lockedUserGets429() {
-        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(true, false));
+        when(mfa.status(eq("u1"), any())).thenReturn(new MfaServiceClient.Status(true, false, false));
         when(mfa.verify(eq("u1"), eq("111111"), any())).thenReturn(MfaResult.LOCKED);
         String id = flow.login("john", "pw").challengeId();
         assertEquals(429, statusOf(() -> flow.verify(id, "111111")));

@@ -46,7 +46,7 @@ class OAuthLoginFlowTest {
                         "web1", "secret", "post", "https://web1.example.com/api/auth/oauth/callback",
                         "openid", "sub", "email", "/", "/login",
                         Duration.ofMinutes(5), resultTtl, true, "/"),
-                "memory", null);
+                "memory", null, null, false);
         when(oauth.authorizationUrl(anyString(), anyString(), anyString())).thenAnswer(inv -> {
             state = inv.getArgument(0);
             nonce = inv.getArgument(1);
@@ -89,7 +89,7 @@ class OAuthLoginFlowTest {
     @Test
     void codeFlowEndsInMfaChallengeAndResultIsSingleUse() {
         OAuthLoginFlow flow = flow(Duration.ofMinutes(1));
-        when(mfa.status(eq(userId), any())).thenReturn(new MfaServiceClient.Status(true, false));
+        when(mfa.status(eq(userId), any())).thenReturn(new MfaServiceClient.Status(true, false, false));
 
         OAuthLoginFlow.Start s = flow.start();
         providerReturns(tokens(nonce, "web1"));
@@ -108,7 +108,7 @@ class OAuthLoginFlowTest {
         OAuthLoginFlow.Start s = flow.start();
         Map<String, Object> tokens = tokens(nonce, "web1");
         providerReturns(tokens);
-        when(mfa.status(userId, (String) tokens.get("id_token"))).thenReturn(new MfaServiceClient.Status(true, false));
+        when(mfa.status(userId, (String) tokens.get("id_token"))).thenReturn(new MfaServiceClient.Status(true, false, false));
 
         assertEquals("MFA_REQUIRED", flow.result(flow.callback("c", state, s.cookieValue())).status());
     }
@@ -116,7 +116,7 @@ class OAuthLoginFlowTest {
     @Test
     void sendsS256ChallengeOfTheVerifierUsedAtTokenEndpoint() {
         OAuthLoginFlow flow = flow(Duration.ofMinutes(1));
-        when(mfa.status(eq(userId), any())).thenReturn(new MfaServiceClient.Status(false, false));
+        when(mfa.status(eq(userId), any())).thenReturn(new MfaServiceClient.Status(false, false, false));
         OAuthLoginFlow.Start s = flow.start();
         when(oauth.authorizationCodeGrant(anyString(), anyString())).thenAnswer(inv -> {
             assertEquals(challenge, OAuthLoginFlow.s256(inv.getArgument(1)));
@@ -131,7 +131,7 @@ class OAuthLoginFlowTest {
     @Test
     void usesUserInfoWhenProviderHasNoIdToken() {
         OAuthLoginFlow flow = flow(Duration.ofMinutes(1));
-        when(mfa.status(eq(userId), any())).thenReturn(new MfaServiceClient.Status(false, true));
+        when(mfa.status(eq(userId), any())).thenReturn(new MfaServiceClient.Status(false, true, false));
         OAuthLoginFlow.Start s = flow.start();
         providerReturns(Map.of("access_token", "opaque-at"));
         when(oauth.userInfo("opaque-at")).thenReturn(Map.of("sub", "ext|user 1", "email", "john@example.com"));
@@ -152,7 +152,7 @@ class OAuthLoginFlowTest {
     @Test
     void stateIsSingleUseAndUnknownStateIsRejected() {
         OAuthLoginFlow flow = flow(Duration.ofMinutes(1));
-        when(mfa.status(eq(userId), any())).thenReturn(new MfaServiceClient.Status(true, false));
+        when(mfa.status(eq(userId), any())).thenReturn(new MfaServiceClient.Status(true, false, false));
         OAuthLoginFlow.Start s = flow.start();
         providerReturns(tokens(nonce, "web1"));
 
@@ -202,7 +202,7 @@ class OAuthLoginFlowTest {
     @Test
     void sweepRevokesOkResultNobodyCollected() {
         OAuthLoginFlow flow = flow(Duration.ofMillis(-1));
-        when(mfa.status(eq(userId), any())).thenReturn(new MfaServiceClient.Status(false, false));
+        when(mfa.status(eq(userId), any())).thenReturn(new MfaServiceClient.Status(false, false, false));
         OAuthLoginFlow.Start s = flow.start();
         providerReturns(tokens(nonce, "web1"));
         String handle = flow.callback("c", state, s.cookieValue());

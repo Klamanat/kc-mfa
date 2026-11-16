@@ -1,5 +1,6 @@
 package com.ktb.kcmfa.starter;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -17,7 +18,8 @@ import org.springframework.web.client.RestClient;
  */
 public class MfaServiceClient {
 
-    public record Status(boolean enrolled, boolean enforce) {}
+    /** inviteRequired: ลงทะเบียนครั้งแรกต้องมีรหัสเชิญจาก admin (service ตั้งต่อ client) */
+    public record Status(boolean enrolled, boolean enforce, boolean inviteRequired) {}
     public record EnrollStart(String secret, String otpauthUri) {}
     public record ResultBody(MfaResult result) {}
 
@@ -43,17 +45,28 @@ public class MfaServiceClient {
         return post(BASE + "/verify", userId, Map.of("code", code), userToken);
     }
 
-    /** @return empty ถ้า user มี MFA อยู่แล้ว (service ตอบ 409) */
-    public Optional<EnrollStart> enrollStart(String userId, String accountName, String userToken) {
+    /**
+     * @param inviteCode รหัสเชิญที่ user ได้จาก admin (null ถ้าเว็บนี้ไม่ได้เปิด invite-required)
+     * @return empty ถ้า user มี MFA อยู่แล้ว (service ตอบ 409)
+     * @throws InviteRejectedException service ตอบ 422 = รหัสเชิญไม่ถูกต้อง
+     */
+    public Optional<EnrollStart> enrollStart(String userId, String accountName, String inviteCode, String userToken) {
+        Map<String, String> body = new HashMap<>();
+        body.put("accountName", accountName);
+        if (inviteCode != null && !inviteCode.isBlank()) {
+            body.put("inviteCode", inviteCode);
+        }
         try {
             return Optional.of(Objects.requireNonNull(rest.post().uri(BASE + "/enroll/start", userId)
                     .headers(h -> auth(h, userToken))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("accountName", accountName))
+                    .body(body)
                     .retrieve()
                     .body(EnrollStart.class)));
         } catch (HttpClientErrorException.Conflict e) {
             return Optional.empty();
+        } catch (HttpClientErrorException.UnprocessableEntity e) {
+            throw new InviteRejectedException(e);
         }
     }
 

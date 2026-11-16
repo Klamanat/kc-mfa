@@ -38,13 +38,22 @@ public record MfaProps(String encryptionKey,
         }
     }
 
-    /** backend ที่อนุญาตให้เรียก service นี้ พร้อม policy ของเว็บนั้น */
     /**
+     * backend ที่อนุญาตให้เรียก service นี้ พร้อม policy ของเว็บนั้น
      * @param loginClientIds    client อื่นของ realm เดียวกันที่ออก token ให้ user ของเว็บนี้ (ถ้า login ไม่ได้ใช้ client-id ตัวเดียวกับ backend)
      * @param externalProviders OAuth provider ภายนอกที่เว็บนี้ใช้ login ได้ (ดู UserTokenVerifier)
+     * @param inviteRequired    ลงทะเบียน MFA ครั้งแรกต้องมีรหัสเชิญที่ admin ออกให้ (กันคนที่รู้แค่รหัสผ่านมา enroll ก่อนเจ้าของ)
+     *                          ไม่ตั้ง = ตาม enforce (เว็บที่บังคับ MFA ต้องใช้รหัสเชิญโดยปริยาย) ตั้ง false เองเท่านั้นจึงจะปิด
+     * @param admin             true = client นี้ (service account ของเครื่องมือ admin) ออกรหัสเชิญ / reset MFA ได้
      */
     public record Client(String realm, String clientId, boolean enforce, String issuerLabel,
-                         List<String> loginClientIds, List<ExternalProvider> externalProviders) {
+                         List<String> loginClientIds, List<ExternalProvider> externalProviders,
+                         Boolean inviteRequired, boolean admin) {
+
+        /** ค่าที่ใช้จริง: ตั้งไว้ใช้ตามนั้น ไม่ตั้งใช้ตาม enforce */
+        public boolean requiresInvite() {
+            return inviteRequired != null ? inviteRequired : enforce;
+        }
 
         public Optional<ExternalProvider> externalProvider(String provider) {
             return externalProviders == null ? Optional.empty()
