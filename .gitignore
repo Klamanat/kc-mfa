@@ -1,0 +1,15 @@
+# Maven build output
+target/
+
+# ไฟล์ข้อมูล/ค่าลับในเครื่อง
+data/
+.env
+*.env
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
